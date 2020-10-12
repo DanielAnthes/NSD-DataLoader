@@ -126,7 +126,7 @@ class NSDLoader:
         else:
             coco_ids = stim_descr['cocoId']
         # add 73K index as column explicitly
-        data = pd.DataFrame(coco_ids).assign(ID73K=coco_ids.index.to_numpy())
+        data = pd.DataFrame(coco_ids).assign(ID73K=coco_ids.index.to_numpy() + 1) # TODO check for off by one error, 
         return data
 
     def get_stim_reps_per_subj(self, subj): # TODO untested
@@ -208,8 +208,11 @@ class NSDLoader:
             # get subject information
             behaviour = pd.read_csv(self.nsda.behavior_file.format(
             subject=subj), delimiter='\t')
+            print(f"NUM UNIQUE IDS: {len(behaviour['73KID'].unique())}")
+            print(F"NUM UNIQUE SELECTOR TRIALS: {len(id_frame['ID73K'].unique())}")
             # select stimuli by inner join on 73K index
-            stim_behav = behaviour[behaviour['73KID'].isin(id_frame['ID73K'])]
+            stim_behav = behaviour[behaviour['73KID'].isin(id_frame['ID73K'].to_list())]
+            print(f"SELECTED TRIALS: {len(stim_behav)}")
             stim_behav.assign(SUBJECT=subj)
             trial_info = trial_info.append(stim_behav)
         return trial_info
@@ -221,7 +224,7 @@ class NSDLoader:
 
 if __name__ == "__main__":
     nsdl = NSDLoader(ROOT)
-    train_stimuli, test_stimuli = nsdl.create_image_split(shared=False)
+    train_stimuli, test_stimuli = nsdl.create_image_split(shared=True)
     trialdata = nsdl.trials_for_stim(['subj01'], train_stimuli)
     trialdata_test = nsdl.trials_for_stim(['subj01'], test_stimuli)
 
