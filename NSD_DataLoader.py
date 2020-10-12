@@ -8,13 +8,6 @@ from math import ceil
 from random import sample
 
 ROOT = op.join("..", "nsd") # root of the data folder, relative to this script. should probably be absolute in final script
-BETAS = op.join(ROOT, "nsddata_betas", "ppdata") # different formats of betas
-BEHAVIOR = op.join(ROOT, 'nsddata', 'ppdata', '{subject}', 'behav', 'responses.tsv') # information about trials, needed to get 73k index of stimuli
-STIMULI = op.join(ROOT, 'nsddata_stimuli', 'stimuli', 'nsd', 'nsd_stimuli.hdf5') # all visual stimuli used in the experiment (no easy way to subset since all stimuli live in one hdf5 file (~37Gb))
-STIM_DESCR = op.join(ROOT, 'nsddata','experiments','nsd','nsd_stim_info_merged.csv') # info about which COCO subset stimuli come from
-ANNOT_FILE = op.join(
-            ROOT, 'nsddata_stimuli', 'stimuli', 'nsd', 'annotations', '{}_{}.json') # COCO annotations, train and validation split. maybe these can be merged into one file for convenience? (check for overlapping 73k indices)
-
 
 class NSDLoader:
 
@@ -132,7 +125,9 @@ class NSDLoader:
             coco_ids = stim_descr[stim_descr['shared1000']==True]['cocoId']
         else:
             coco_ids = stim_descr['cocoId']
-        return coco_ids
+        # add 73K index as column explicitly
+        data = pd.DataFrame(coco_ids).assign(ID73K=coco_ids.index.to_numpy())
+        return data
 
     def get_stim_reps_per_subj(self, subj): # TODO untested
         '''
@@ -193,23 +188,44 @@ class NSDLoader:
         num_test = ceil(num_ids * test_fraction)
         num_train = num_ids - num_test
         
-        ids = ids.sample(frac=1) # random sampling all datapoints in pandas is equivalent to shuffle
+        ids = ids.sample(frac=1, replace=False) # randomly sampling all datapoints in pandas is equivalent to shuffle
         train_stimuli = ids.iloc[0:num_train]
         test_stimuli = ids.iloc[num_train:]
 
         return train_stimuli, test_stimuli
 
-            
+    def trials_for_stim(self, subjects, id_frame):
+        '''
+        returns a list of all trials for a given participant in which the given stimuli were shown
 
+        INPUTS:
+            subjects - list of subjects for which to retrieve trial data
+            id_frame - pandas frame with stimulus indices as produced by create_imgage_split
+        '''
+        # initialize dataframe to return
+        trial_info = pd.DataFrame()
+        for subj in subjects:
+            # get subject information
+            behaviour = pd.read_csv(self.nsda.behavior_file.format(
+            subject=subj), delimiter='\t')
+            # select stimuli by inner join on 73K index
+            stim_behav = behaviour[behaviour['73KID'].isin(id_frame['ID73K'])]
+            stim_behav.assign(SUBJECT=subj)
+            trial_info = trial_info.append(stim_behav)
+        return trial_info
+        
+        
 
 
 # test cases
 
 if __name__ == "__main__":
     nsdl = NSDLoader(ROOT)
-    train_stimuli, test_stimuli = nsdl.create_image_split()
-    print(train_stimuli.shape, test_stimuli.shape)
-    print(test_stimuli)
+    train_stimuli, test_stimuli = nsdl.create_image_split(shared=False)
+    trialdata = nsdl.trials_for_stim(['subj01'], train_stimuli)
+    trialdata_test = nsdl.trials_for_stim(['subj01'], test_stimuli)
+
+    
     '''
     # print summary of available data
     print("DATA SUMMARY")
