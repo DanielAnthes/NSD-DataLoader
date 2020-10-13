@@ -208,12 +208,10 @@ class NSDLoader:
             # get subject information
             behaviour = pd.read_csv(self.nsda.behavior_file.format(
             subject=subj), delimiter='\t')
-            print(f"NUM UNIQUE IDS: {len(behaviour['73KID'].unique())}")
-            print(F"NUM UNIQUE SELECTOR TRIALS: {len(id_frame['ID73K'].unique())}")
-            # select stimuli by inner join on 73K index
-            stim_behav = behaviour[behaviour['73KID'].isin(id_frame['ID73K'].to_list())]
-            print(f"SELECTED TRIALS: {len(stim_behav)}")
+            stim_behav = behaviour[behaviour['73KID'].isin(id_frame['ID73K'].to_list())] # filter for stimuli to be selected
             stim_behav.assign(SUBJECT=subj)
+            # keep relevant columns
+            stim_behav = stim_behav[["SUBJECT", "SESSION", "RUN", "TRIAL", "73KID"]]
             trial_info = trial_info.append(stim_behav)
         return trial_info
         
@@ -226,7 +224,6 @@ if __name__ == "__main__":
     nsdl = NSDLoader(ROOT)
     train_stimuli, test_stimuli = nsdl.create_image_split(shared=True)
     trialdata = nsdl.trials_for_stim(['subj01'], train_stimuli)
-    trialdata_test = nsdl.trials_for_stim(['subj01'], test_stimuli)
 
     
     '''
