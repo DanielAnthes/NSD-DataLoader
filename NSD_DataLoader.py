@@ -43,8 +43,6 @@ class NSDLoader:
         '''
         behav_data = self.nsda.read_behavior(subj, sess, trial_index=trial) # nsda claims to count sessions starting from 0, but this does not seem to be the case
         im_id_73_info = behav_data['73KID']
-        print(f" 73KIDs FROM  BEHAVIOUR FILE {im_id_73_info}")
-        # idx_73k = im_id_73_info[trial].to_list()
         idx_73k = im_id_73_info.to_list()
         betas = self.nsda.read_betas(subj, sess, trial_index=trial, data_type='betas_fithrf_GLMdenoise_RR', data_format='fsaverage')
         
@@ -291,12 +289,12 @@ class NSDLoader:
                     else:
                         if load_imgs:
                             b, c, im = self.get_data_by_trial(subj_string, s, indices.to_list(), load_images=True)
-                            captions.append(c)
+                            captions += c
                             betas = np.concatenate((betas, b), axis=1)
                             ims = np.concatenate((ims, im), axis=0)
                         else:
                             b, c = self.get_data_by_trial(subj_string, s, indices.to_list(), load_images=False)
-                            captions.append(c)
+                            captions += c
                             betas = np.concatenate((betas, b), axis=1)
 
         if load_imgs:
