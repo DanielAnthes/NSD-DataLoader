@@ -230,7 +230,7 @@ class NSDLoader:
 
         return train_stimuli, test_stimuli
 
-    def trials_for_stim(self, id_frame, subjects=[]):
+    def trials_for_stim(self, subjects, id_frame):
         '''
         returns a list of all trials for a given participant in which the given stimuli were shown
 
