@@ -41,10 +41,11 @@ class NSDLoader:
                 captions: list of captions from COCO
                 betas: beta values for trial
         '''
-        print(f"GET DATA BY TRIAL SESS: {sess}")
         behav_data = self.nsda.read_behavior(subj, sess, trial_index=trial) # nsda claims to count sessions starting from 0, but this does not seem to be the case
         im_id_73_info = behav_data['73KID']
-        idx_73k = im_id_73_info[trial].to_list()
+        print(f" 73KIDs FROM  BEHAVIOUR FILE {im_id_73_info}")
+        # idx_73k = im_id_73_info[trial].to_list()
+        idx_73k = im_id_73_info.to_list()
         betas = self.nsda.read_betas(subj, sess, trial_index=trial, data_type='betas_fithrf_GLMdenoise_RR', data_format='fsaverage')
         
         if len(trial) == 1:
@@ -66,15 +67,12 @@ class NSDLoader:
 
             unique_id = np.unique(idx_73k[idx])
             im = self.nsda.read_images(unique_id, show=False)
-            print(im.shape)
             # associate loaded images with correct 73k index
             if len(trial) == 1:
                 im = im[0]
             else:
                 imshape = im.shape[1:]
                 images = np.zeros((len(idx_73k), *imshape), dtype=np.uint8)
-                print(images.shape)
-                print(len(idx_73k))
                 for i, im_index in enumerate(idx_73k):
                     impos = np.where(unique_id==im_index)[0][0]
                     images[i,:,:,:] = im[impos,:,:,:]
@@ -266,7 +264,6 @@ class NSDLoader:
             SESS_IDX - 0 based index of trial in session as created by calculate_session_index, NOT trial in run
         batch - int or None, if int return iterator that returns batches of max size 'batch' to avoid memory overflows
         '''
-        print(load_imgs)
         # TODO try to limit access to coco annotation file to improve performance (~ 1.3 seconds per annotation access since file is loaded into memory)
         # alternatively adjust nsd_access package so that annotations are kept in memory
         # TODO also return subject for each datapoint?
@@ -274,8 +271,8 @@ class NSDLoader:
         if batch: # todo: batch load data to avoid memory overflows
             raise NotImplementedError
         else:
-            betas = None
-            ims = None
+            betas = list()
+            ims = list()
             captions = list()
 
             subjects = trialinfo["SUBJECT"].unique()
@@ -286,7 +283,7 @@ class NSDLoader:
                 for s in sessions:
                     print(f"SESSION {s}")
                     indices = trialinfo["SESS_IDX"][(trialinfo["SUBJECT"]==subj) & (trialinfo["SESSION"]==s)]
-                    if betas == None:
+                    if len(betas) == 0:
                         if load_imgs:
                             betas, captions, ims = self.get_data_by_trial(subj_string, s, indices.to_list(), load_images=True)
                         else:
@@ -296,7 +293,7 @@ class NSDLoader:
                             b, c, im = self.get_data_by_trial(subj_string, s, indices.to_list(), load_images=True)
                             captions.append(c)
                             betas = np.concatenate((betas, b), axis=1)
-                            ims = np.concatenate(ims, im)
+                            ims = np.concatenate((ims, im), axis=0)
                         else:
                             b, c = self.get_data_by_trial(subj_string, s, indices.to_list(), load_images=False)
                             captions.append(c)
@@ -313,13 +310,15 @@ class NSDLoader:
 if __name__ == "__main__":
     nsdl = NSDLoader(ROOT)
     train_stimuli, test_stimuli = nsdl.create_image_split(shared=True)
-    trialdata = nsdl.trials_for_stim(['subj01'], train_stimuli)
+    trialdata = nsdl.trials_for_stim(['subj01','subj02'], train_stimuli)
     trialinf = nsdl.calculate_session_index(trialdata)    
     
-    trialinf
-    '''
+    trialinf = trialinf[trialinf["SESSION"].isin([1,2])] # exclude data for which no betas are available locally
+
+
     betas, captions, images = nsdl.load_data(trialinf, load_imgs=True)
 
+'''
     print(captions[4])
     plotimage = images[4]
     print(plotimage.shape)
