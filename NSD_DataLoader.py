@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import regex as re
 from math import ceil
 from random import sample
+import os
 
 ROOT = op.join("..", "nsd") # root of the data folder, relative to this script. should probably be absolute in final script
 
@@ -26,7 +27,7 @@ class NSDLoader:
             captions.append(info_dict['caption'])
         return captions
     
-    def get_info_by_trial(self, subj, sess, trial):
+    def get_data_by_trial(self, subj, sess, trial, load_images=True):
         '''
         PARAMS:
             subj:   subject identifier string e.g. 'subj01'
@@ -40,7 +41,8 @@ class NSDLoader:
                 captions: list of captions from COCO
                 betas: beta values for trial
         '''
-        behav_data = self.nsda.read_behavior(subj, sess, trial_index=trial)
+        print(f"GET DATA BY TRIAL SESS: {sess}")
+        behav_data = self.nsda.read_behavior(subj, sess, trial_index=trial) # nsda claims to count sessions starting from 0, but this does not seem to be the case
         im_id_73_info = behav_data['73KID']
         idx_73k = im_id_73_info[trial].to_list()
         betas = self.nsda.read_betas(subj, sess, trial_index=trial, data_type='betas_fithrf_GLMdenoise_RR', data_format='fsaverage')
@@ -51,17 +53,33 @@ class NSDLoader:
         else:
             captions = [self.extract_Coco_Annotations(x) for x in self.nsda.read_image_coco_info(idx_73k)]
 
-        # to get images 73k indices must be sorted
-        idx_73k = np.array(idx_73k)
-        idx = np.argsort(idx_73k)
-        reverse_idx = np.argsort(idx)
-        im = self.nsda.read_images(idx_73k[idx], show=False)
-        im = im[reverse_idx]
+        if not load_images:
+            return betas, captions
+        
+        else:
+            # to get images 73k indices must be sorted
+            idx_73k = np.array(idx_73k)
 
-        if len(trial) == 1:
-            im = im[0]
+            idx = np.argsort(idx_73k)
 
-        return captions, betas, im
+            # hdf5 library needs indices to be STRICTLY increasing, so remove duplicates and only load each image once
+
+            unique_id = np.unique(idx_73k[idx])
+            im = self.nsda.read_images(unique_id, show=False)
+            print(im.shape)
+            # associate loaded images with correct 73k index
+            if len(trial) == 1:
+                im = im[0]
+            else:
+                imshape = im.shape[1:]
+                images = np.zeros((len(idx_73k), *imshape), dtype=np.uint8)
+                print(images.shape)
+                print(len(idx_73k))
+                for i, im_index in enumerate(idx_73k):
+                    impos = np.where(unique_id==im_index)[0][0]
+                    images[i,:,:,:] = im[impos,:,:,:]
+                im = images
+            return betas, captions, im
 
     def get_data_info(self, verbose=False):
         '''
@@ -151,7 +169,7 @@ class NSDLoader:
         rep_frame.columns = ['73K', 'n_reps']
         return rep_frame
 
-    def trialID_to_sess_trial(self, data_info, subj, trialID): # TODO untested
+    def trialID_to_sess_trial(self, data_info, subj, trialID): # TODO untested, unused
         '''
         INPUT:
             data_info - dictionary as constructed by get_data_info
@@ -175,6 +193,28 @@ class NSDLoader:
         num_trial = trialID - sum(trial_counts[:sess])
         return sess, num_trial
     
+    def calculate_session_index(self, trialinfo): # TODO untested
+        '''
+        INPUTS:
+            trialinfo: dataframe with information about trials to collect, as created by trials_for_stim
+        RETURNS:
+            updated trialinfo dataframe with added column "SESS_IDX" containing 0 based index of trial within a session
+
+        Data is organized in sessions, runs and trials:
+        each full session consists of 12 runs where even runs have trial numbers 1:62, odd runs have trials 1:63
+        '''
+        prev_run = trialinfo["RUN"] - 1
+        trial = trialinfo["TRIAL"]
+        # calculate how many trials passed in previous runs in the current session
+        num_even = prev_run // 2
+        num_odd = num_even.apply(lambda x: x if x % 2 == 0 else x+1)
+        prev_trials = num_even * 62 + num_odd * 63
+        sess_idx = prev_trials + trial - 1 # subtract 1 for zero based index within session
+        trialinfo = trialinfo.assign(SESS_IDX=sess_idx) # add output column
+        return trialinfo
+        
+
+
     def create_image_split(self, test_fraction=.2, shared=True):
         '''
         randomly splits all trials into a training and a test set so that each stimulus only occurs in one set
@@ -214,8 +254,58 @@ class NSDLoader:
             stim_behav = stim_behav[["SUBJECT", "SESSION", "RUN", "TRIAL", "73KID"]]
             trial_info = trial_info.append(stim_behav)
         return trial_info
+    
+    def load_data(self, trialinfo, batch=None, load_imgs=True):
+        '''
+        loads data for trials specified in pandas dataframe.
         
-        
+        INPUTS
+        trialinfo - Dataframe must have the following columns:
+            SUBJECT - subject the datapoint belongs to
+            SESSION - session the datapoint belongs to
+            SESS_IDX - 0 based index of trial in session as created by calculate_session_index, NOT trial in run
+        batch - int or None, if int return iterator that returns batches of max size 'batch' to avoid memory overflows
+        '''
+        print(load_imgs)
+        # TODO try to limit access to coco annotation file to improve performance (~ 1.3 seconds per annotation access since file is loaded into memory)
+        # alternatively adjust nsd_access package so that annotations are kept in memory
+        # TODO also return subject for each datapoint?
+        # TODO implement disabling image loading to save memory
+        if batch: # todo: batch load data to avoid memory overflows
+            raise NotImplementedError
+        else:
+            betas = None
+            ims = None
+            captions = list()
+
+            subjects = trialinfo["SUBJECT"].unique()
+            for i in range(len(subjects)):
+                subj = subjects[i]
+                subj_string = f"subj{str(subj).zfill(2)}" # create subject string of format subjAA where AA is zero padded subj number
+                sessions = (trialinfo["SESSION"][trialinfo["SUBJECT"] == subj]).unique()
+                for s in sessions:
+                    print(f"SESSION {s}")
+                    indices = trialinfo["SESS_IDX"][(trialinfo["SUBJECT"]==subj) & (trialinfo["SESSION"]==s)]
+                    if betas == None:
+                        if load_imgs:
+                            betas, captions, ims = self.get_data_by_trial(subj_string, s, indices.to_list(), load_images=True)
+                        else:
+                            betas, captions = self.get_data_by_trial(subj_string, s, indices.to_list(), load_images=False)
+                    else:
+                        if load_imgs:
+                            b, c, im = self.get_data_by_trial(subj_string, s, indices.to_list(), load_images=True)
+                            captions.append(c)
+                            betas = np.concatenate((betas, b), axis=1)
+                            ims = np.concatenate(ims, im)
+                        else:
+                            b, c = self.get_data_by_trial(subj_string, s, indices.to_list(), load_images=False)
+                            captions.append(c)
+                            betas = np.concatenate((betas, b), axis=1)
+
+        if load_imgs:
+            return betas, captions, ims
+        else:
+            return betas, captions
 
 
 # test cases
@@ -224,9 +314,18 @@ if __name__ == "__main__":
     nsdl = NSDLoader(ROOT)
     train_stimuli, test_stimuli = nsdl.create_image_split(shared=True)
     trialdata = nsdl.trials_for_stim(['subj01'], train_stimuli)
-
+    trialinf = nsdl.calculate_session_index(trialdata)    
     
+    trialinf
     '''
+    betas, captions, images = nsdl.load_data(trialinf, load_imgs=True)
+
+    print(captions[4])
+    plotimage = images[4]
+    print(plotimage.shape)
+    plt.figure()
+    plt.imshow(plotimage)
+    plt.show()
     # print summary of available data
     print("DATA SUMMARY")
     nsdl.get_data_info(verbose=True)
