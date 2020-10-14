@@ -8,11 +8,23 @@ from math import ceil
 from random import sample
 import os
 
-ROOT = op.join("..", "nsd") # root of the data folder, relative to this script. should probably be absolute in final script
+ROOT = op.join("..", "nsd") # root of the data folder, adjust to path to nsd dataset
 
 class NSDLoader:
+    '''
+    Data Loader for the nsd dataset based on the nsd_access package:
+    https://github.com/tknapen/nsd_access
+    Allows for loading beta values, captions and images from the nsd dataset and splitting them
+    into training and test sets. Optionally creates an iterator for loading the data in batches.
+    '''
 
     def __init__(self, nsd_loc, data_type='betas_fithrf_GLMdenoise_RR', data_format='fsaverage'):
+        '''
+        INPUTS:
+            nsd_loc: path to the roor folder of the nsd dataset, file structure is assumed to be as in the original dataset
+            data_type: types of betas to load
+            data_format: format of betas to load
+        '''
         self.nsda = nsda.NSDAccess(nsd_loc)
         self.data_type = data_type
         self.data_format = data_format
@@ -21,6 +33,11 @@ class NSDLoader:
         '''
         For each 73k index read_image_coco_info returns a list of dictionaries, 
         this helper function extracts all captions into a single list
+        
+        INPUTS:
+            coco_info: information about one stimulus in the coco dataset, as returned by read_image_coco_info (nsda)
+        RETURNS:
+            captions: a list of captions labelling the stimulus
         '''
         captions = list()
         for info_dict in coco_info:
@@ -29,22 +46,22 @@ class NSDLoader:
     
     def get_data_by_trial(self, subj, sess, trial, load_images=True):
         '''
-        PARAMS:
+        INPUTS:
             subj:   subject identifier string e.g. 'subj01'
             sess:   session number, int (starting to count from 1)
-            trial:  trial number to get, by index. TODO check index base
+            trial:  list of trials to get, by index. TODO check index base
         
         RETURNS:
             tuple (stimulus, captions, betas)
             with
-                stimulus: image presented at trial
-                captions: list of captions from COCO
-                betas: beta values for trial
+                stimulus: image presented at trial(s), numpy array
+                captions: list of captions from COCO, or list of list for multiple data points
+                betas: beta values for trial(s), numpy array
         '''
         behav_data = self.nsda.read_behavior(subj, sess, trial_index=trial) # nsda claims to count sessions starting from 0, but this does not seem to be the case
         im_id_73_info = behav_data['73KID']
         idx_73k = im_id_73_info.to_list()
-        betas = self.nsda.read_betas(subj, sess, trial_index=trial, data_type='betas_fithrf_GLMdenoise_RR', data_format='fsaverage')
+        betas = self.nsda.read_betas(subj, sess, trial_index=trial, data_type=self.data_type, data_format=self.data_format)
         
         if len(trial) == 1:
             coco_return = self.nsda.read_image_coco_info(idx_73k)
@@ -218,6 +235,9 @@ class NSDLoader:
         INPUTS:
             test_fraction   - fraction of stimuli to hold out for testing
             shared          - if True only include stimuli seen by all participants
+        
+        RETURNS:
+            pandas dataframes with stimulus information. Split into training and test set
         '''
         ids = self.get_stimulus_ids(shared)
         num_ids = len(ids)
@@ -237,6 +257,9 @@ class NSDLoader:
         INPUTS:
             subjects - list of subjects for which to retrieve trial data
             id_frame - pandas frame with stimulus indices as produced by create_imgage_split
+        
+        RETURNS:
+            pandas dataframe containing information needed to load data, for all trials in which stimuli in id_frame were shown
         '''
         # initialize dataframe to return
         trial_info = pd.DataFrame()
@@ -255,16 +278,20 @@ class NSDLoader:
         '''
         loads data for trials specified in pandas dataframe.
         
-        INPUTS
+        INPUTS:
         trialinfo - Dataframe must have the following columns:
             SUBJECT - subject the datapoint belongs to
             SESSION - session the datapoint belongs to
             SESS_IDX - 0 based index of trial in session as created by calculate_session_index, NOT trial in run
+
+        RETURNS:
+            betas: numpy array containing betas for all loaded trials, shape depends on data format
+            captions: list of captions describing stimulus used in each trial (list of lists for multiple trials)
+            ims (optional): numpy array containing all images used in the loaded trials. Shape (trials, 425, 525, 3)
         '''
         # TODO try to limit access to coco annotation file to improve performance (~ 1.3 seconds per annotation access since file is loaded into memory)
         # alternatively adjust nsd_access package so that annotations are kept in memory
         # TODO also return subject for each datapoint?
-        # TODO implement disabling image loading to save memory
         betas = list()
         ims = list()
         captions = list()
@@ -331,29 +358,5 @@ if __name__ == "__main__":
 
     data_iter = nsdl.load_batch_data(trialinf, 100, load_imgs=True)
 
-
-'''
-    print(captions[4])
-    plotimage = images[4]
-    print(plotimage.shape)
-    plt.figure()
-    plt.imshow(plotimage)
-    plt.show()
-    # print summary of available data
-    print("DATA SUMMARY")
-    nsdl.get_data_info(verbose=True)
-    print("#####\n")
-    # test for one datapoint
-    SESSION = 1
-    SUBJECT = "subj01"
-    captions, betas, im = nsdl.get_info_by_trial(SUBJECT, SESSION, [42])
-
-    # shared stimuli cocoIDs
-    print(nsdl.shared_imgs())
-
-    print(captions)
-    print(betas.shape)
-    plt.figure(figsize=(12,4))
-    plt.imshow(im)
-    plt.show()
-    '''
+    for b,c,i in data_iter:
+        print(f"betas: {b.shape}\ncaptions: {len(c)}\nimages: {i.shape}")
