@@ -251,7 +251,7 @@ class NSDLoader:
             trial_info = trial_info.append(stim_behav)
         return trial_info
     
-    def load_data(self, trialinfo, batch=None, load_imgs=True):
+    def load_data(self, trialinfo, load_imgs=True):
         '''
         loads data for trials specified in pandas dataframe.
         
@@ -260,47 +260,62 @@ class NSDLoader:
             SUBJECT - subject the datapoint belongs to
             SESSION - session the datapoint belongs to
             SESS_IDX - 0 based index of trial in session as created by calculate_session_index, NOT trial in run
-        batch - int or None, if int return iterator that returns batches of max size 'batch' to avoid memory overflows
         '''
         # TODO try to limit access to coco annotation file to improve performance (~ 1.3 seconds per annotation access since file is loaded into memory)
         # alternatively adjust nsd_access package so that annotations are kept in memory
         # TODO also return subject for each datapoint?
         # TODO implement disabling image loading to save memory
-        if batch: # todo: batch load data to avoid memory overflows
-            raise NotImplementedError
-        else:
-            betas = list()
-            ims = list()
-            captions = list()
+        betas = list()
+        ims = list()
+        captions = list()
 
-            subjects = trialinfo["SUBJECT"].unique()
-            for i in range(len(subjects)):
-                subj = subjects[i]
-                subj_string = f"subj{str(subj).zfill(2)}" # create subject string of format subjAA where AA is zero padded subj number
-                sessions = (trialinfo["SESSION"][trialinfo["SUBJECT"] == subj]).unique()
-                for s in sessions:
-                    print(f"SESSION {s}")
-                    indices = trialinfo["SESS_IDX"][(trialinfo["SUBJECT"]==subj) & (trialinfo["SESSION"]==s)]
-                    if len(betas) == 0:
-                        if load_imgs:
-                            betas, captions, ims = self.get_data_by_trial(subj_string, s, indices.to_list(), load_images=True)
-                        else:
-                            betas, captions = self.get_data_by_trial(subj_string, s, indices.to_list(), load_images=False)
+        subjects = trialinfo["SUBJECT"].unique()
+        for i in range(len(subjects)):
+            subj = subjects[i]
+            subj_string = f"subj{str(subj).zfill(2)}" # create subject string of format subjAA where AA is zero padded subj number
+            sessions = (trialinfo["SESSION"][trialinfo["SUBJECT"] == subj]).unique()
+            for s in sessions:
+                print(f"SESSION {s}")
+                indices = trialinfo["SESS_IDX"][(trialinfo["SUBJECT"]==subj) & (trialinfo["SESSION"]==s)]
+                if len(betas) == 0:
+                    if load_imgs:
+                        betas, captions, ims = self.get_data_by_trial(subj_string, s, indices.to_list(), load_images=True)
                     else:
-                        if load_imgs:
-                            b, c, im = self.get_data_by_trial(subj_string, s, indices.to_list(), load_images=True)
-                            captions += c
-                            betas = np.concatenate((betas, b), axis=1)
-                            ims = np.concatenate((ims, im), axis=0)
-                        else:
-                            b, c = self.get_data_by_trial(subj_string, s, indices.to_list(), load_images=False)
-                            captions += c
-                            betas = np.concatenate((betas, b), axis=1)
+                        betas, captions = self.get_data_by_trial(subj_string, s, indices.to_list(), load_images=False)
+                else:
+                    if load_imgs:
+                        b, c, im = self.get_data_by_trial(subj_string, s, indices.to_list(), load_images=True)
+                        captions += c
+                        betas = np.concatenate((betas, b), axis=1)
+                        ims = np.concatenate((ims, im), axis=0)
+                    else:
+                        b, c = self.get_data_by_trial(subj_string, s, indices.to_list(), load_images=False)
+                        captions += c
+                        betas = np.concatenate((betas, b), axis=1)
 
         if load_imgs:
             return betas, captions, ims
         else:
             return betas, captions
+
+    def load_batch_data(self, trialinfo, batchsize, load_imgs=True):
+        '''
+        load data in batches to avoid memory overflow
+
+        INPUTS:
+            trialinfo: pandas dataframe containing the trials to load. Must include the fields
+                    SUBJECT, SESSION, SESS_IDX
+            batchsize: integer value, denotes maximum number of trials to load per batch (may be less for last batch)
+        RETURNS:
+            data_iter: iterator object that can be used to load the data
+        '''
+        num_trials = len(trialinfo)
+        slice_indices = np.arange(batchsize, num_trials, batchsize)
+        indices = np.split(np.array(range(num_trials)), slice_indices)
+
+        for i in indices:
+            data = trialinfo.iloc[i]
+            yield self.load_data(data, load_imgs=load_imgs)
 
 
 # test cases
@@ -314,7 +329,8 @@ if __name__ == "__main__":
     trialinf = trialinf[trialinf["SESSION"].isin([1,2])] # exclude data for which no betas are available locally
 
 
-    betas, captions, images = nsdl.load_data(trialinf, load_imgs=True)
+    data_iter = nsdl.load_batch_data(trialinf, 100, load_imgs=True)
+
 
 '''
     print(captions[4])
