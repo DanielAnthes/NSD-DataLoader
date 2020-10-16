@@ -139,10 +139,11 @@ class NSDLoader:
 
         return data_per_subj
 
-    def get_stimulus_ids(self, shared=False):
+    def get_stimulus_ids(self, subset="shared", participant=""):
         '''
         INPUT:
-            shared - filter by stimuli shown to all participants
+            subset - one of "shared", "unique", "all": filter dataset to return only shared stimuli, only stimuli not seen by every participant, or all stimuli
+            participant - optional: filter for stimuli shown to participant
 
         OUTPUT:
             cocoIDs of selected stimuli, pandas Series object, index is 73k index in [0 72999]
@@ -151,11 +152,25 @@ class NSDLoader:
                 self.nsda.stim_descriptions = pd.read_csv(
                     self.nsda.stimuli_description_file, index_col=0)
         stim_descr = self.nsda.stim_descriptions
+        
+        # filter for participant
+        if len(participant) > 0:
+            p_number = int(participant[-2:])
+            col = stim_descr.columns[7 + p_number]
+            print(f"filtering dataset for : {col}")
+            mask = stim_descr[col] == 1
+            stim_descr = stim_descr[mask]
+            print(f"number of stimuli available: {len(stim_descr)}")
+
         # get  image ids
-        if shared:
+        if subset == "shared":
             coco_ids = stim_descr[stim_descr['shared1000']==True]['cocoId']
-        else:
+        elif subset == "all":
             coco_ids = stim_descr['cocoId']
+        elif subset == "unique":
+            coco_ids = stim_descr[stim_descr['shared1000']==False]['cocoId']
+        else:
+            raise Exception("unknown subset parameter")
         # add 73K index as column explicitly
         data = pd.DataFrame(coco_ids).assign(ID73K=coco_ids.index.to_numpy() + 1) # TODO check for off by one error, 
         return data
@@ -228,23 +243,28 @@ class NSDLoader:
         
 
 
-    def create_image_split(self, test_fraction=.2, shared=True):
+    def create_image_split(self, data_fraction=1, test_fraction=.2, subset="shared", participant=""):
         '''
         randomly splits all trials into a training and a test set so that each stimulus only occurs in one set
         
         INPUTS:
-            test_fraction   - fraction of stimuli to hold out for testing
-            shared          - if True only include stimuli seen by all participants
-        
+            subset          - string in "shared", "unique", "all" filters stimuli by either images seen by all participants, images not seen by all participants, all images
+            data_fraction   - percentage of available stimuli to select
+            test_fraction   - fraction of selected stimuli to hold out for testing 
+                                (e.g. for 100 trials with data_fraction=.5 and test_fraction=.5 the function will return a training and a test set with 25 trials each)
+            participant    - optional: give the name of a participant to ensure that the sampled stimuli were shown to that participant
+
         RETURNS:
             pandas dataframes with stimulus information. Split into training and test set
         '''
-        ids = self.get_stimulus_ids(shared)
+        ids = self.get_stimulus_ids(subset, participant) # filtering for participant happens here if participant flag is set
+        ids = ids.sample(frac=data_fraction, replace=False) # randomly sampling all datapoints in pandas is equivalent to shuffle, so with frac=1 returns full shuffled dataset
+        
         num_ids = len(ids)
         num_test = ceil(num_ids * test_fraction)
         num_train = num_ids - num_test
         
-        ids = ids.sample(frac=1, replace=False) # randomly sampling all datapoints in pandas is equivalent to shuffle
+        
         train_stimuli = ids.iloc[0:num_train]
         test_stimuli = ids.iloc[num_train:]
 
@@ -349,7 +369,10 @@ class NSDLoader:
 
 if __name__ == "__main__":
     nsdl = NSDLoader(ROOT)
-    train_stimuli, test_stimuli = nsdl.create_image_split(shared=True)
+    train_stimuli, test_stimuli = nsdl.create_image_split(subset="unique", participant="subj03")
+    print(train_stimuli.shape)
+    print(test_stimuli.shape)
+    '''
     trialdata = nsdl.trials_for_stim(['subj01','subj02'], train_stimuli)
     trialinf = nsdl.calculate_session_index(trialdata)    
     
@@ -360,3 +383,4 @@ if __name__ == "__main__":
 
     for b,c,i in data_iter:
         print(f"betas: {b.shape}\ncaptions: {len(c)}\nimages: {i.shape}")
+    '''
