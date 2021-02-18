@@ -160,7 +160,7 @@ class NSDLoader:
             print(f"filtering dataset for : {col}")
             mask = stim_descr[col] == 1
             stim_descr = stim_descr[mask]
-            print(f"number of stimuli available: {len(stim_descr)}")
+            print(f"number of stimuli available for {col}: {len(stim_descr)}")
 
         # get  image ids
         if subset == "shared":
@@ -171,6 +171,8 @@ class NSDLoader:
             coco_ids = stim_descr[stim_descr['shared1000']==False]['cocoId']
         else:
             raise Exception("unknown subset parameter")
+
+        print(f"after filtering for: {subset}, {len(coco_ids)} stimuli are available")
         # add 73K index as column explicitly
         data = pd.DataFrame(coco_ids).assign(ID73K=coco_ids.index.to_numpy() + 1) # TODO check for off by one error, 
         return data
@@ -369,7 +371,7 @@ class NSDLoader:
 
 if __name__ == "__main__":
     nsdl = NSDLoader(ROOT)
-    train_stimuli, test_stimuli = nsdl.create_image_split(subset="unique", participant="subj03")
+    train_stimuli, test_stimuli = nsdl.create_image_split(subset="all", participant="subj04")
     print(train_stimuli.shape)
     print(test_stimuli.shape)
     '''
@@ -384,3 +386,8 @@ if __name__ == "__main__":
     for b,c,i in data_iter:
         print(f"betas: {b.shape}\ncaptions: {len(c)}\nimages: {i.shape}")
     '''
+
+    stim_descr = nsdl.nsda.stim_descriptions
+    unique = stim_descr[stim_descr["shared1000"] == False]
+    subjcols = unique.columns[8:16]
+    unique[subjcols].apply(lambda x: np.sum(x), axis=1).max()
