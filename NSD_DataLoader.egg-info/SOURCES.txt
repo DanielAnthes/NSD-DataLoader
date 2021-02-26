@@ -1,6 +1,0 @@
-NSD_DataLoader
-setup.py
-NSD_DataLoader.egg-info/PKG-INFO
-NSD_DataLoader.egg-info/SOURCES.txt
-NSD_DataLoader.egg-info/dependency_links.txt
-NSD_DataLoader.egg-info/top_level.txt
