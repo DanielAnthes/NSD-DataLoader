@@ -1,8 +1,8 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
-    name='NSD_DataLoader',
+    name='nsdloader',
     version='0.1',
     install_requires=["nsd_access", "pandas", "numpy", "regex"],
-    scripts=['NSD_DataLoader/NSD_DataLoader.py']
+    packages=find_packages(),
 )

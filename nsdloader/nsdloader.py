@@ -8,7 +8,6 @@ from math import ceil
 from random import sample
 import os
 
-ROOT = op.join("..", "nsd") # root of the data folder, adjust to path to nsd dataset
 
 class NSDLoader:
     '''
