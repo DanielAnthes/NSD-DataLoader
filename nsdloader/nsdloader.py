@@ -295,7 +295,7 @@ class NSDLoader:
             trial_info = trial_info.append(stim_behav)
         return trial_info
     
-    def load_data(self, trialinfo, load_imgs=True):
+    def load_data(self, trialinfo, load_captions=True, load_imgs=True):
         '''
         loads data for trials specified in pandas dataframe.
         
@@ -346,7 +346,17 @@ class NSDLoader:
         else:
             return betas, captions
 
-    def load_batch_data(self, trialinfo, batchsize, load_imgs=True):
+        returnvals = [betas]
+        
+        if load_captions:
+            returnvals.append(captions)
+
+        if load_imgs:
+            returnvals.append(ims)
+
+        return tuple(returnvals)
+
+    def load_batch_data(self, trialinfo, batchsize, load_imgs=True, load_captions=True):
         '''
         load data in batches to avoid memory overflow
 
