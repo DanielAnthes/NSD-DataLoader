@@ -5,6 +5,7 @@ import nsd_access as nsda
 import re
 import numpy as np
 import random
+import h5py
 
 def BufferedLoader(nsd_root, subjects, bufsize, shape=(327684,), format='fsaverage', type="betas_fithrf_GLMdenoise_RR", shufflefiles=True, shuffledata=True):
     '''
@@ -19,8 +20,6 @@ def BufferedLoader(nsd_root, subjects, bufsize, shape=(327684,), format='fsavera
 
     Probably should be used with care if data from multiple participants is used to train a model since
     there are no guarantees that each time the buffer is filled with trials from all participants
-
-    returns: a tensorflow dataset created using from_generator
     '''
     nsdaccess = nsda.NSDAccess(nsd_root)
 
@@ -72,16 +71,16 @@ def BufferedLoader(nsd_root, subjects, bufsize, shape=(327684,), format='fsavera
             for i in indices:
                 yield betas[i]
 
-    return tf.data.Dataset.from_generator(
-                nsd_generator,
-                output_signature=tf.TensorSpec(shape=shape, dtype=tf.float32)
-            )
+    return nsd_generator
         
+def hdf5_generator(path, dataset):
+    with h5py.File(path, 'r') as f:
+        num_datapoints = f[dataset].shape[0]
+        for i in range(num_datapoints):
+            yield f[dataset][i,:]
+
 if __name__ == "__main__":
-    NSDDIR = '/home/daniel/Documents/Masterarbeit/NSD'
-    TYPE = 'betas_fithrf_GLMdenoise_RR'
-    FORMAT = 'fsaverage'
-    df = BufferedLoader(NSDDIR, ["subj02"], 4)
-    data = df.take(3)
-    for d in data:
-        print(d.shape)
+    path = '/home/daniel/Documents/Masterarbeit/NSD/nsddata_betas/ppdata/subj02/fsaverage/betas_fithrf_GLMdenoise_RR/subj02.hdf5'
+    dataset = 'subj02'
+
+    ds = tf.data.Dataset.from_generator(hdf5_generator, args=[path, dataset], output_types=tf.float32)
