@@ -96,7 +96,7 @@ def write_dataset_to_tfrecords(data, subject, prefix, shard_size=500):
         shard_num += 1
 
 
-def read_tfrecords(dataset_name, working_dir='.', subset=[]):
+def read_tfrecords(dataset_name, working_dir='.', subset=[], num_parallel=1):
     '''
     takes the name (prefix) for a tfrecords dataset with one or more files
     and returns a TFRecordDataset instance
@@ -115,6 +115,6 @@ def read_tfrecords(dataset_name, working_dir='.', subset=[]):
     print(f"selected {len(data_files)} files belonging to dataset {dataset_name}")
     
     data_paths = [os.path.join(working_dir, file) for file in data_files]
-    tfrecord_dataset = tf.data.TFRecordDataset(data_files)
+    tfrecord_dataset = tf.data.TFRecordDataset(data_paths, num_parallel_reads=num_parallel)
     return tfrecord_dataset
 
