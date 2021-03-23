@@ -162,7 +162,8 @@ def images_to_tfrecords(files, subject, prefix, shard_size=500):
 
         filename = f"{prefix}_{shard_num}.tfrecords"
         with tf.io.TFRecordWriter(filename) as writer:
-            for f in files:
+            for numf in enumerate(d):
+                print(f"writing image {numf}", end="\r")
                 im = img.imread(f)
                 im = im[:,:,:3]  # remove alpha channel
                 im = rgb2gray(im)
