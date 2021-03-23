@@ -6,6 +6,7 @@ import re
 import numpy as np
 import random
 import h5py
+import time
 
 def BufferedLoader(nsd_root, subjects, bufsize, shape=(327684,), format='fsaverage', type="betas_fithrf_GLMdenoise_RR", shufflefiles=True, shuffledata=True):
     '''
@@ -77,7 +78,8 @@ def hdf5_generator(path, dataset):
     with h5py.File(path, 'r') as f:
         num_datapoints = f[dataset].shape[0]
         for i in range(num_datapoints):
-            yield f[dataset][i,:]
+            data = f[dataset][i,:]
+            yield data
 
 if __name__ == "__main__":
     path = '/home/daniel/Documents/Masterarbeit/NSD/nsddata_betas/ppdata/subj02/fsaverage/betas_fithrf_GLMdenoise_RR/subj02.hdf5'

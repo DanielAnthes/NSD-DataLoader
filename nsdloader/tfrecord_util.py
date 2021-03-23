@@ -9,6 +9,16 @@ import numpy as np
 import tensorflow as tf
 import h5py
 import re
+import matplotlib.image as img
+from PIL import Image, ImageOps
+
+
+def rgb2gray(image):
+    '''
+    helper function for converting rgb image to grayscale
+    '''
+    gray_im = np.dot(image, np.array([0.2126, 0.7152, 0.0722]))
+    return gray_im
 
 
 # The following functions can be used to convert a value to a type compatible
@@ -49,6 +59,27 @@ def create_record(data, subject):
     example = tf.train.Example(features=features)
     return example
 
+def create_image_record(data, subject):
+    '''
+    creates a tensorflow example from one datapoint of the NSD dataset
+
+    data    -   beta values for a single trial
+    subject -   subject the betas belong to
+    '''
+    xdim = data.shape[0]
+    ydim = data.shape[1]
+    data = tf.convert_to_tensor(data, dtype=tf.float32)  # convert to tensorflow datatype
+    feature = {
+        'xdim': _int64_feature(xdim),
+        'ydim': _int64_feature(ydim),
+        'subject': _int64_feature(subject),
+        'betas': _bytes_feature(tf.io.serialize_tensor(data))
+    }
+    features = tf.train.Features(feature=feature)
+    example = tf.train.Example(features=features)
+    return example
+
+
 
 def read_tfrecord(serialized_example):
     '''
@@ -64,7 +95,24 @@ def read_tfrecord(serialized_example):
     dimension = example['dimension']
     subject = example['subject']
     betas = tf.io.parse_tensor(example['betas'], out_type=tf.float32)
+    return dimension, subject, betas
 
+
+def read_image_tfrecord(serialized_example):
+    '''
+    parses a serialized record
+    '''
+    feature_description = {
+        'xdim': tf.io.FixedLenFeature((), tf.int64),
+        'ydim': tf.io.FixedLenFeature((), tf.int64),
+        'subject': tf.io.FixedLenFeature((), tf.int64),
+        'betas': tf.io.FixedLenFeature((), tf.string)
+    }
+
+    example = tf.io.parse_single_example(serialized_example, feature_description)
+    dimension = (example['xdim'], example['ydim'])
+    subject = example['subject']
+    betas = tf.io.parse_tensor(example['betas'], out_type=tf.float32)
     return dimension, subject, betas
 
 
@@ -89,6 +137,35 @@ def write_dataset_to_tfrecords(data, subject, prefix, shard_size=500):
         with tf.io.TFRecordWriter(filename) as writer:
             for dp in d:
                 example = create_record(dp, subject)
+                serialized_example = example.SerializeToString()
+                writer.write(serialized_example)
+
+        i += shard_size
+        shard_num += 1
+
+
+def images_to_tfrecords(files, subject, prefix, shard_size=500):
+    '''
+    takes a list of images and saves all images as a tfrecords dataset,
+    groups images together in multiple separate tfrecords files as given by
+    shard_size parameter
+    '''
+    n_data = len(files)
+    i = 0
+    shard_num = 0
+    while i < n_data:
+        if i + shard_size < n_data:
+            d = files[i:i+shard_size]
+        else:
+            d = files[i:]
+
+        filename = f"{prefix}_{shard_num}.tfrecords"
+        with tf.io.TFRecordWriter(filename) as writer:
+            for f in files:
+                im = img.imread(f)
+                im = im[:,:,:3]  # remove alpha channel
+                im = rgb2gray(im)
+                example = create_image_record(im, subject)
                 serialized_example = example.SerializeToString()
                 writer.write(serialized_example)
 
