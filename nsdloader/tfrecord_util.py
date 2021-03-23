@@ -154,6 +154,7 @@ def images_to_tfrecords(files, subject, prefix, shard_size=500):
     i = 0
     shard_num = 0
     while i < n_data:
+        print(f"writing shard {shard_num}", end="\r")
         if i + shard_size < n_data:
             d = files[i:i+shard_size]
         else:
