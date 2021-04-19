@@ -375,6 +375,19 @@ class NSDLoader:
             data = trialinfo.iloc[i]
             yield self.load_data(data, load_imgs=load_imgs)
 
+    def load_batch_data_with_info(self, trialinfo, batchsize, load_imgs=True, load_captions=True):
+        '''
+        load data in batches, return additional information about trials
+        '''
+        num_trials = len(trialinfo)
+        slice_indices = np.arange(batchsize, num_trials, batchsize)
+        indices = np.split(np.array(range(num_trials)), slice_indices)
+
+        for i in indices:
+            data = trialinfo.iloc[i]
+            yield (self.load_data(data, load_imgs=load_imgs), data)
+
+
 
 # test cases
 

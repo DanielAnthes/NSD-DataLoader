@@ -144,6 +144,25 @@ def write_dataset_to_tfrecords(data, subject, prefix, shard_size=500):
         shard_num += 1
 
 
+def create_record_with_info():
+    pass
+
+def write_batch_to_tfrecord(data, filename, subject):
+    '''
+    takes a single batch of data from memory and writes it to
+    a single tfrecords file
+
+    data        -   datapoints to be written to tfrecords file
+    filename    -   path of tfrecords file
+    '''
+    with tf.io.TFRecordWriter(filename) as writer:
+        for dp in data:
+            example = create_record_with_info(dp, subject)
+            serialized_example = example.SerializeToString()
+            writer.write(serialized_example)
+
+
+
 def images_to_tfrecords(files, subject, prefix, shard_size=500):
     '''
     takes a list of images and saves all images as a tfrecords dataset,
