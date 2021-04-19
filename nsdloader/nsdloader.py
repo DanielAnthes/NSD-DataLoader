@@ -373,7 +373,7 @@ class NSDLoader:
 
         for i in indices:
             data = trialinfo.iloc[i]
-            yield self.load_data(data, load_imgs=load_imgs)
+            yield self.load_data(data, load_imgs=load_imgs, load_captions=load_captions)
 
     def load_batch_data_with_info(self, trialinfo, batchsize, load_imgs=True, load_captions=True):
         '''
@@ -385,7 +385,7 @@ class NSDLoader:
 
         for i in indices:
             data = trialinfo.iloc[i]
-            yield (self.load_data(data, load_imgs=load_imgs), data)
+            yield (self.load_data(data, load_imgs=load_imgs, load_captions=load_captions), data)
 
 
 
