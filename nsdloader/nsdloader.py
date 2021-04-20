@@ -1,4 +1,4 @@
-import nsd_access as nsda
+
 import pandas as pd
 from os import path as op
 import numpy as np
@@ -7,6 +7,7 @@ import regex as re
 from math import ceil
 from random import sample
 import os
+import nsd_access as nsda
 
 
 class NSDLoader:
@@ -57,7 +58,7 @@ class NSDLoader:
                 captions: list of captions from COCO, or list of list for multiple data points
                 betas: beta values for trial(s), numpy array
         '''
-        behav_data = self.nsda.read_behavior(subj, sess, trial_index=trial) # nsda claims to count sessions starting from 0, but this does not seem to be the case
+        behav_data = self.nsda.read_behavior(subj, sess, trial_index=trial)
         im_id_73_info = behav_data['73KID']
         idx_73k = im_id_73_info.to_list()
         betas = self.nsda.read_betas(subj, sess, trial_index=trial, data_type=self.data_type, data_format=self.data_format)
@@ -222,25 +223,35 @@ class NSDLoader:
         num_trial = trialID - sum(trial_counts[:sess])
         return sess, num_trial
     
-    def calculate_session_index(self, trialinfo): # TODO untested
-        '''
-        INPUTS:
-            trialinfo: dataframe with information about trials to collect, as created by trials_for_stim
-        RETURNS:
-            updated trialinfo dataframe with added column "SESS_IDX" containing 0 based index of trial within a session
+    def calculate_session_index(self, trialinfo):
+        sessions = trialinfo["SESSION"].unique()
+        sess_indices = list()
 
-        Data is organized in sessions, runs and trials:
-        each full session consists of 12 runs where even runs have trial numbers 1:62, odd runs have trials 1:63
-        '''
-        prev_run = trialinfo["RUN"] - 1
-        trial = trialinfo["TRIAL"]
-        # calculate how many trials passed in previous runs in the current session
-        num_even = prev_run // 2
-        num_odd = num_even.apply(lambda x: x if x % 2 == 0 else x+1)
-        prev_trials = num_even * 62 + num_odd * 63
-        sess_idx = prev_trials + trial - 1 # subtract 1 for zero based index within session
-        trialinfo = trialinfo.assign(SESS_IDX=sess_idx) # add output column
+        for s in sessions:
+            sess_behav = trialinfo[trialinfo["SESSION"] == s]
+            sess_indices += list(range(len(sess_behav)))
+
+        trialinfo = trialinfo.assign(SESS_IDX=sess_indices)
         return trialinfo
+
+
+    #     INPUTS:
+    #         trialinfo: dataframe with information about trials to collect, as created by trials_for_stim
+    #     RETURNS:
+    #         updated trialinfo dataframe with added column "SESS_IDX" containing 0 based index of trial within a session
+
+    #     Data is organized in sessions, runs and trials:
+    #     each full session consists of 12 runs where even runs have trial numbers 1:62, odd runs have trials 1:63
+    #     '''
+    #     prev_run = trialinfo["RUN"] - 1
+    #     trial = trialinfo["TRIAL"]
+    #     # calculate how many trials passed in previous runs in the current session
+    #     num_even = prev_run // 2
+    #     num_odd = num_even.apply(lambda x: x if x % 2 == 0 else x+1)
+    #     prev_trials = num_even * 62 + num_odd * 63
+    #     sess_idx = prev_trials + trial - 1 # subtract 1 for zero based index within session
+    #     trialinfo = trialinfo.assign(SESS_IDX=sess_idx) # add output column
+    #     return trialinfo
         
 
 
