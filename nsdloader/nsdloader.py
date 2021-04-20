@@ -223,7 +223,11 @@ class NSDLoader:
         num_trial = trialID - sum(trial_counts[:sess])
         return sess, num_trial
     
-    def calculate_session_index(self, trialinfo):
+    def session_index_enumerate(self, trialinfo):
+        '''
+        enumerates entries for each session in the order they occur in the dataframe
+        CAUTION: this will not produce meaningful session indices in applied to incomplete dataframes
+        '''
         sessions = trialinfo["SESSION"].unique()
         sess_indices = list()
 
@@ -234,24 +238,25 @@ class NSDLoader:
         trialinfo = trialinfo.assign(SESS_IDX=sess_indices)
         return trialinfo
 
+    def calculate_session_index(self, trialinfo):
+        '''
+        INPUTS:
+            trialinfo: dataframe with information about trials to collect, as created by trials_for_stim
+        RETURNS:
+            updated trialinfo dataframe with added column "SESS_IDX" containing 0 based index of trial within a session
 
-    #     INPUTS:
-    #         trialinfo: dataframe with information about trials to collect, as created by trials_for_stim
-    #     RETURNS:
-    #         updated trialinfo dataframe with added column "SESS_IDX" containing 0 based index of trial within a session
-
-    #     Data is organized in sessions, runs and trials:
-    #     each full session consists of 12 runs where even runs have trial numbers 1:62, odd runs have trials 1:63
-    #     '''
-    #     prev_run = trialinfo["RUN"] - 1
-    #     trial = trialinfo["TRIAL"]
-    #     # calculate how many trials passed in previous runs in the current session
-    #     num_even = prev_run // 2
-    #     num_odd = num_even.apply(lambda x: x if x % 2 == 0 else x+1)
-    #     prev_trials = num_even * 62 + num_odd * 63
-    #     sess_idx = prev_trials + trial - 1 # subtract 1 for zero based index within session
-    #     trialinfo = trialinfo.assign(SESS_IDX=sess_idx) # add output column
-    #     return trialinfo
+        Data is organized in sessions, runs and trials:
+        each full session consists of 12 runs where even runs have trial numbers 1:62, odd runs have trials 1:63
+        '''
+        prev_run = trialinfo["RUN"] - 1
+        trial = trialinfo["TRIAL"]
+        # calculate how many trials passed in previous runs in the current session
+        num_even = prev_run // 2
+        num_odd = num_even.apply(lambda x: x if x % 2 == 0 else x+1)
+        prev_trials = num_even * 62 + num_odd * 63
+        sess_idx = prev_trials + trial - 1 # subtract 1 for zero based index within session
+        trialinfo = trialinfo.assign(SESS_IDX=sess_idx) # add output column
+        return trialinfo
         
 
 
@@ -299,6 +304,7 @@ class NSDLoader:
             # get subject information
             behaviour = pd.read_csv(self.nsda.behavior_file.format(
             subject=subj), delimiter='\t')
+            behaviour = self.session_index_enumerate(behaviour)
             stim_behav = behaviour[behaviour['73KID'].isin(id_frame['ID73K'].to_list())] # filter for stimuli to be selected
             stim_behav.assign(SUBJECT=subj)
             # keep relevant columns
