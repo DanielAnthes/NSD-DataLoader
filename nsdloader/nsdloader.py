@@ -43,7 +43,7 @@ class NSDLoader:
             captions.append(info_dict['caption'])
         return captions
     
-    def get_data_by_trial(self, subj, sess, trial, load_images=True):
+    def get_data_by_trial(self, subj, sess, trial, load_images=True, load_captions=True):
         '''
         INPUTS:
             subj:   subject identifier string e.g. 'subj01'
@@ -62,11 +62,14 @@ class NSDLoader:
         idx_73k = im_id_73_info.to_list()
         betas = self.nsda.read_betas(subj, sess, trial_index=trial, data_type=self.data_type, data_format=self.data_format)
         
-        if len(trial) == 1:
-            coco_return = self.nsda.read_image_coco_info(idx_73k)
-            captions = self.extract_Coco_Annotations(coco_return)
+        if load_captions:
+            if len(trial) == 1:
+                coco_return = self.nsda.read_image_coco_info(idx_73k)
+                captions = self.extract_Coco_Annotations(coco_return)
+            else:
+                captions = [self.extract_Coco_Annotations(x) for x in self.nsda.read_image_coco_info(idx_73k)]
         else:
-            captions = [self.extract_Coco_Annotations(x) for x in self.nsda.read_image_coco_info(idx_73k)]
+            captions = list()  # return empty list for consistent return types
 
         if not load_images:
             return betas, captions
@@ -343,17 +346,17 @@ class NSDLoader:
                 indices = trialinfo["SESS_IDX"][(trialinfo["SUBJECT"]==subj) & (trialinfo["SESSION"]==s)]
                 if len(betas) == 0:
                     if load_imgs:
-                        betas, captions, ims = self.get_data_by_trial(subj_string, s, indices.to_list(), load_images=True)
+                        betas, captions, ims = self.get_data_by_trial(subj_string, s, indices.to_list(), load_images=True, load_captions=load_captions)
                     else:
-                        betas, captions = self.get_data_by_trial(subj_string, s, indices.to_list(), load_images=False)
+                        betas, captions = self.get_data_by_trial(subj_string, s, indices.to_list(), load_images=False, load_captions=load_captions)
                 else:
                     if load_imgs:
-                        b, c, im = self.get_data_by_trial(subj_string, s, indices.to_list(), load_images=True)
+                        b, c, im = self.get_data_by_trial(subj_string, s, indices.to_list(), load_images=True, load_captions=load_captions)
                         captions += c
                         betas = np.concatenate((betas, b), axis=1)
                         ims = np.concatenate((ims, im), axis=0)
                     else:
-                        b, c = self.get_data_by_trial(subj_string, s, indices.to_list(), load_images=False)
+                        b, c = self.get_data_by_trial(subj_string, s, indices.to_list(), load_images=False, load_captions=load_captions)
                         captions += c
                         betas = np.concatenate((betas, b), axis=1)
 
