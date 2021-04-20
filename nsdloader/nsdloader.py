@@ -1,4 +1,3 @@
-
 import pandas as pd
 from os import path as op
 import numpy as np
@@ -357,11 +356,6 @@ class NSDLoader:
                         b, c = self.get_data_by_trial(subj_string, s, indices.to_list(), load_images=False)
                         captions += c
                         betas = np.concatenate((betas, b), axis=1)
-
-        if load_imgs:
-            return betas, captions, ims
-        else:
-            return betas, captions
 
         returnvals = [betas]
         
