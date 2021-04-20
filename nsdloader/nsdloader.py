@@ -308,7 +308,7 @@ class NSDLoader:
             stim_behav = behaviour[behaviour['73KID'].isin(id_frame['ID73K'].to_list())] # filter for stimuli to be selected
             stim_behav.assign(SUBJECT=subj)
             # keep relevant columns
-            stim_behav = stim_behav[["SUBJECT", "SESSION", "RUN", "TRIAL", "73KID"]]
+            stim_behav = stim_behav[["SUBJECT", "SESSION", "RUN", "TRIAL", "73KID", "SESS_IDX"]]
             trial_info = trial_info.append(stim_behav)
         return trial_info
     
