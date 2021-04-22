@@ -1,6 +1,5 @@
 '''
 utility for creating tfrecords datasets
-expects the data in a single hdf5 file
 '''
 
 
@@ -144,10 +143,35 @@ def write_dataset_to_tfrecords(data, subject, prefix, shard_size=500):
         shard_num += 1
 
 
-def create_record_with_info():
-    pass
+def create_record_with_info(betas, subj, sess, id73k, sess_idx):
+    '''
+    creates a tensorflow example from one datapoint of the NSD dataset
+    includes information about data to uniquely identify datapoint
 
-def write_batch_to_tfrecord(data, filename, subject):
+    betas    -   beta values for a single trial
+    subj     -  subject number
+    sess     -  recording session from NSD info
+    id73k    -  stimulus id from NSD dataset
+    sess_idx -  index within session form NSD recording
+    '''
+    dim = betas.shape[0]
+    data = tf.convert_to_tensor(betas, dtype=tf.float32)  # convert to tensorflow datatype
+    feature = {
+        'dimension': _int64_feature(dim),
+        'subject': _int64_feature(subj),
+        'betas': _bytes_feature(tf.io.serialize_tensor(data)),
+        'sess' : _int64_feature(sess),
+        'id73k': _int64_feature(id73k),
+        'sess_idx': _int64_feature(sess_idx)
+    }
+    features = tf.train.Features(feature=feature)
+    example = tf.train.Example(features=features)
+    return example
+
+
+    
+
+def write_batch_to_tfrecord(betas, info ,filename):
     '''
     takes a single batch of data from memory and writes it to
     a single tfrecords file
@@ -156,8 +180,9 @@ def write_batch_to_tfrecord(data, filename, subject):
     filename    -   path of tfrecords file
     '''
     with tf.io.TFRecordWriter(filename) as writer:
-        for dp in data:
-            example = create_record_with_info(dp, subject)
+        for b, i in zip(betas, info):
+            subject, session, id73k, sess_idx = i[0], i[1], i[4], i[5]
+            example = create_record_with_info(b, subject, session, id73k, sess_idx)
             serialized_example = example.SerializeToString()
             writer.write(serialized_example)
 
