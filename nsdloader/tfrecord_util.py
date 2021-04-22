@@ -109,7 +109,7 @@ def read_tfrecord_with_info(serialized_example):
     example = tf.io.parse_single_example(serialized_example, feature_description)
     dim = example['dimension']
     subj = example['subject']
-    betas = tf.io.parse_tensor(example['beats'], out_type=tf.float32)
+    betas = tf.io.parse_tensor(example['betas'], out_type=tf.float32)
     sess = example['sess']
     id73k = example['id73k']
     idx = example['sess_idx']
