@@ -97,6 +97,26 @@ def read_tfrecord(serialized_example):
     return dimension, subject, betas
 
 
+def read_tfrecord_with_info(serialized_example):
+    feature_description = {
+        'dimension': tf.io.FixedLenFeature((), tf.int64),
+        'subject': tf.io.FixedLenFeature((), tf.int64),
+        'betas': tf.io.FixedLenFeature((), tf.string),  # tensors / arrays are bytestrings
+        'sess': tf.io.FixedLenFeature((), tf.int64),
+        'id73k': tf.io.FixedLenFeature((), tf.int64),
+        'sess_idx': tf.io.FixedLenFeature((), tf.int64)
+    }
+    example = tf.io.parse_single_example(serialized_example, feature_description)
+    dim = example['dimension']
+    subj = example['subject']
+    betas = tf.io.parse_tensor(example['beats'], out_type=tf.float32)
+    sess = example['sess']
+    id73k = example['id73k']
+    idx = example['sess_idx']
+
+    return betas, dim, subj, sess, idx, id73k 
+
+
 def read_image_tfrecord(serialized_example):
     '''
     parses a serialized record
