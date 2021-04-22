@@ -199,8 +199,12 @@ def write_batch_to_tfrecord(betas, info ,filename):
     data        -   datapoints to be written to tfrecords file
     filename    -   path of tfrecords file
     '''
+    batchsize = betas.shape[1]
+    info = info.to_numpy()
     with tf.io.TFRecordWriter(filename) as writer:
-        for b, i in zip(betas, info.to_numpy()):
+        for idx in range(batchsize):
+            b = betas[:,idx]
+            i = info[idx,:]
             subject, session, id73k, sess_idx = i[0], i[1], i[4], i[5]
             example = create_record_with_info(b, subject, session, id73k, sess_idx)
             serialized_example = example.SerializeToString()
