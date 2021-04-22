@@ -180,7 +180,7 @@ def write_batch_to_tfrecord(betas, info ,filename):
     filename    -   path of tfrecords file
     '''
     with tf.io.TFRecordWriter(filename) as writer:
-        for b, i in zip(betas, info):
+        for b, i in zip(betas, info.to_numpy()):
             subject, session, id73k, sess_idx = i[0], i[1], i[4], i[5]
             example = create_record_with_info(b, subject, session, id73k, sess_idx)
             serialized_example = example.SerializeToString()
