@@ -80,6 +80,7 @@ def create_image_record(data, subject):
 
 
 
+
 def read_tfrecord(serialized_example):
     '''
     parses a serialized record
@@ -110,6 +111,28 @@ def read_tfrecord_with_info(serialized_example):
     dim = example['dimension']
     subj = example['subject']
     betas = tf.io.parse_tensor(example['betas'], out_type=tf.float32)
+    sess = example['sess']
+    id73k = example['id73k']
+    idx = example['sess_idx']
+
+    return betas, dim, subj, sess, idx, id73k 
+
+
+def read_image_record_with_info(serialized_example):
+    feature_description = {
+        'xdim': tf.io.FixedLenFeature((), tf.int64),
+        'ydim': tf.io.FixedLenFeature((), tf.int64),
+        'subject': tf.io.FixedLenFeature((), tf.int64),
+        'betas': tf.io.FixedLenFeature((), tf.string),  # tensors / arrays are bytestrings
+        'sess': tf.io.FixedLenFeature((), tf.int64),
+        'id73k': tf.io.FixedLenFeature((), tf.int64),
+        'sess_idx': tf.io.FixedLenFeature((), tf.int64)
+    }
+    example = tf.io.parse_single_example(serialized_example, feature_description)
+    dim = (example["xdim"], example["ydim"])
+    subj = example['subject']
+    betas = tf.io.parse_tensor(example['betas'], out_type=tf.float32)
+    betas = tf.ensure_shape(betas, shape=dim)
     sess = example['sess']
     id73k = example['id73k']
     idx = example['sess_idx']
@@ -189,7 +212,27 @@ def create_record_with_info(betas, subj, sess, id73k, sess_idx):
     return example
 
 
-    
+def create_image_record_with_info(betas, subj, sess, id73k, sess_idx):
+    '''
+    creates a tensorflow example from a single flatmap.
+    Includes information about data to uniquely identify datapoint
+    '''
+    xdim = betas.shape[0]
+    ydim = betas.shape[1]
+    data = tf.convert_to_tensor(betas, dtype=tf.float32)  # convert to tensorflow datatype
+    feature = {
+        'xdim': _int64_feature(xdim),
+        'ydim': _int64_feature(ydim),
+        'subject': _int64_feature(subj),
+        'betas': _bytes_feature(tf.io.serialize_tensor(data)),
+        'sess' : _int64_feature(sess),
+        'id73k': _int64_feature(id73k),
+        'sess_idx': _int64_feature(sess_idx)
+    }
+    features = tf.train.Features(feature=features)
+    example = tf.train.Example(features=features)
+    return example
+
 
 def write_batch_to_tfrecord(betas, info ,filename):
     '''
