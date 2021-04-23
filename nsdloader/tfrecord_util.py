@@ -229,7 +229,7 @@ def create_image_record_with_info(betas, subj, sess, id73k, sess_idx):
         'id73k': _int64_feature(id73k),
         'sess_idx': _int64_feature(sess_idx)
     }
-    features = tf.train.Features(feature=features)
+    features = tf.train.Features(feature=feature)
     example = tf.train.Example(features=features)
     return example
 
