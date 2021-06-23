@@ -228,7 +228,9 @@ class NSDLoader:
     def session_index_enumerate(self, trialinfo):
         '''
         enumerates entries for each session in the order they occur in the dataframe
-        CAUTION: this will not produce meaningful session indices in applied to incomplete dataframes
+        CAUTION: this will not produce meaningful session indices in applied to incomplete dataframes.
+        only use to add index to the full trial info dataframe for a participant.
+        Adds a zero based index for each trial, across sessions.
         '''
         sessions = trialinfo["SESSION"].unique()
         sess_indices = list()
@@ -240,7 +242,7 @@ class NSDLoader:
         trialinfo = trialinfo.assign(SESS_IDX=sess_indices)
         return trialinfo
 
-    def calculate_session_index(self, trialinfo):
+    def calculate_session_index(self, trialinfo):  # TODO carefully test, if the full behavioral information pandas frame is available consider using session_index_enumerate instead
         '''
         INPUTS:
             trialinfo: dataframe with information about trials to collect, as created by trials_for_stim
@@ -406,6 +408,7 @@ class NSDLoader:
 # test cases
 
 if __name__ == "__main__":
+    ROOT = ""  # add root directory of local copy of the NSD dataset, must be in original folder structure
     nsdl = NSDLoader(ROOT)
     train_stimuli, test_stimuli = nsdl.create_image_split(subset="all", participant="subj04")
     print(train_stimuli.shape)
