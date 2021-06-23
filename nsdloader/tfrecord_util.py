@@ -15,14 +15,15 @@ from PIL import Image, ImageOps
 def rgb2gray(image):
     '''
     helper function for converting rgb image to grayscale
+    ratio of color channels according to wikipedia: https://en.wikipedia.org/wiki/Grayscale#Grayscale_as_single_channels_of_multichannel_colour_images
     '''
     gray_im = np.dot(image, np.array([0.2126, 0.7152, 0.0722]))
     return gray_im
 
-
 # The following functions can be used to convert a value to a type compatible
 # with tf.train.Example.
-
+# source / documentation for helper function:
+# https://towardsdatascience.com/tfrecords-explained-24b8f2133282
 def _bytes_feature(value):
   """Returns a bytes_list from a string / byte."""
   if isinstance(value, type(tf.constant(0))):
@@ -78,12 +79,59 @@ def create_image_record(data, subject):
     example = tf.train.Example(features=features)
     return example
 
+def create_record_with_info(betas, subj, sess, id73k, sess_idx):
+    '''
+    creates a tensorflow example from one datapoint of the NSD dataset
+    includes information about data to uniquely identify datapoint
 
+    betas    -   beta values for a single trial
+    subj     -  subject number
+    sess     -  recording session from NSD info
+    id73k    -  stimulus id from NSD dataset
+    sess_idx -  index within session form NSD recording
+    '''
+    dim = betas.shape[0]
+    data = tf.convert_to_tensor(betas, dtype=tf.float32)  # convert to tensorflow datatype
+    feature = {
+        'dimension': _int64_feature(dim),
+        'subject': _int64_feature(subj),
+        'betas': _bytes_feature(tf.io.serialize_tensor(data)),
+        'sess' : _int64_feature(sess),
+        'id73k': _int64_feature(id73k),
+        'sess_idx': _int64_feature(sess_idx)
+    }
+    features = tf.train.Features(feature=feature)
+    example = tf.train.Example(features=features)
+    return example
+
+
+def create_image_record_with_info(betas, subj, sess, id73k, sess_idx):
+    '''
+    creates a tensorflow example from a single flatmap.
+    Includes information about data to uniquely identify datapoint
+    '''
+    xdim = betas.shape[0]
+    ydim = betas.shape[1]
+    data = tf.convert_to_tensor(betas, dtype=tf.float32)  # convert to tensorflow datatype
+    feature = {
+        'xdim': _int64_feature(xdim),
+        'ydim': _int64_feature(ydim),
+        'subject': _int64_feature(subj),
+        'betas': _bytes_feature(tf.io.serialize_tensor(data)),
+        'sess' : _int64_feature(sess),
+        'id73k': _int64_feature(id73k),
+        'sess_idx': _int64_feature(sess_idx)
+    }
+    features = tf.train.Features(feature=feature)
+    example = tf.train.Example(features=features)
+    return example
 
 
 def read_tfrecord(serialized_example):
     '''
     parses a serialized record
+    takes as input a serialized example, deserializes it and returns its features
+    The example is expected to have fields according to the feature_description dictionary defined below
     '''
     feature_description = {
         'dimension': tf.io.FixedLenFeature((), tf.int64),
@@ -99,6 +147,11 @@ def read_tfrecord(serialized_example):
 
 
 def read_tfrecord_with_info(serialized_example):
+    '''
+    same as read_tfrecord, expects the serialized example to have additional fields
+    adding information about the datum.
+    Parses examples as created with create_record_with_info
+    '''
     feature_description = {
         'dimension': tf.io.FixedLenFeature((), tf.int64),
         'subject': tf.io.FixedLenFeature((), tf.int64),
@@ -184,54 +237,6 @@ def write_dataset_to_tfrecords(data, subject, prefix, shard_size=500):
 
         i += shard_size
         shard_num += 1
-
-
-def create_record_with_info(betas, subj, sess, id73k, sess_idx):
-    '''
-    creates a tensorflow example from one datapoint of the NSD dataset
-    includes information about data to uniquely identify datapoint
-
-    betas    -   beta values for a single trial
-    subj     -  subject number
-    sess     -  recording session from NSD info
-    id73k    -  stimulus id from NSD dataset
-    sess_idx -  index within session form NSD recording
-    '''
-    dim = betas.shape[0]
-    data = tf.convert_to_tensor(betas, dtype=tf.float32)  # convert to tensorflow datatype
-    feature = {
-        'dimension': _int64_feature(dim),
-        'subject': _int64_feature(subj),
-        'betas': _bytes_feature(tf.io.serialize_tensor(data)),
-        'sess' : _int64_feature(sess),
-        'id73k': _int64_feature(id73k),
-        'sess_idx': _int64_feature(sess_idx)
-    }
-    features = tf.train.Features(feature=feature)
-    example = tf.train.Example(features=features)
-    return example
-
-
-def create_image_record_with_info(betas, subj, sess, id73k, sess_idx):
-    '''
-    creates a tensorflow example from a single flatmap.
-    Includes information about data to uniquely identify datapoint
-    '''
-    xdim = betas.shape[0]
-    ydim = betas.shape[1]
-    data = tf.convert_to_tensor(betas, dtype=tf.float32)  # convert to tensorflow datatype
-    feature = {
-        'xdim': _int64_feature(xdim),
-        'ydim': _int64_feature(ydim),
-        'subject': _int64_feature(subj),
-        'betas': _bytes_feature(tf.io.serialize_tensor(data)),
-        'sess' : _int64_feature(sess),
-        'id73k': _int64_feature(id73k),
-        'sess_idx': _int64_feature(sess_idx)
-    }
-    features = tf.train.Features(feature=feature)
-    example = tf.train.Example(features=features)
-    return example
 
 
 def write_batch_to_tfrecord(betas, info ,filename):

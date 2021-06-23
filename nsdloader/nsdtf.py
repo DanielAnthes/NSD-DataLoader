@@ -8,6 +8,13 @@ import random
 import h5py
 import time
 
+'''
+DEPRECATED - loading data from mgh files directly has significant computational overhead and is likely too slow for training a model.
+Instead, it is better to use the DataLoader class to load the required data once, preprocess it and save it in a format more
+suited for quick loading (e.g. hdf5 or tfrecords for Tensorflow)
+'''
+
+
 def BufferedLoader(nsd_root, subjects, bufsize, shape=(327684,), format='fsaverage', type="betas_fithrf_GLMdenoise_RR", shufflefiles=True, shuffledata=True):
     '''
     nsd_root    -   path to root of nsd dataset
